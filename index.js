@@ -48,12 +48,20 @@ const startServer = async () => {
     // NUEVOS ESQUEMAS PARA CONTACTOS
     const telefonoSchema = new mongoose.Schema({
       numero: { type: String, required: true },
-      tipo: { type: String, enum: ["personal", "trabajo", "movil", "fijo"], default: "personal" },
+      tipo: {
+        type: String,
+        enum: ["personal", "trabajo", "movil", "fijo"],
+        default: "personal",
+      },
     });
 
     const emailSchema = new mongoose.Schema({
       direccion: { type: String, required: true },
-      tipo: { type: String, enum: ["personal", "trabajo", "principal", "secundario"], default: "personal" },
+      tipo: {
+        type: String,
+        enum: ["personal", "trabajo", "principal", "secundario"],
+        default: "personal",
+      },
     });
 
     const contactoSchema = new mongoose.Schema({
@@ -276,5 +284,151 @@ const startServer = async () => {
     console.error("❌ Error conectando a MongoDB:", error.message);
   }
 };
+
+const ingredienteSchema = new mongoose.Schema({
+  proveedor: { type: String, default: "" },
+  nombre: { type: String, required: true },
+  valor: { type: Number, default: 0, required: true },
+  gr: { type: Number, default: 0, required: true },
+  fechaCreacion: { type: Date, default: Date.now },
+});
+
+const Ingrediente = mongoose.model("Ingrediente", ingredienteSchema);
+
+// Obtener todos los ingredientes
+app.get("/api/ingredientes", async (req, res) => {
+  try {
+    const ingredientes = await Ingrediente.find().sort({ fechaCreacion: -1 });
+    res.json(ingredientes);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Crear un nuevo ingrediente
+app.post("/api/ingredientes", async (req, res) => {
+  try {
+    const { proveedor, nombre, valor, gr } = req.body;
+
+    // Validación
+    if (!nombre || nombre.trim() === "") {
+      return res.status(400).json({ error: "El nombre es obligatorio" });
+    }
+
+    if (!valor) {
+      return res.status(400).json({ error: "El valor es obligatorio" });
+    }
+
+    if (!gr) {
+      return res
+        .status(400)
+        .json({ error: "El peso en gramos es obligatorio" });
+    }
+
+    const ingrediente = new Ingrediente({
+      proveedor: proveedor?.trim() || "",
+      nombre: nombre.trim(),
+      valor: valor,
+      gr: gr,
+    });
+
+    await ingrediente.save();
+    res.json(ingrediente);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Actualizar un ingrediente
+app.put("/api/ingredientes/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { proveedor, nombre, valor, gr } = req.body;
+
+    // Validación de ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "ID de ingrediente inválido" });
+    }
+
+    // Validación
+    if (!nombre || nombre.trim() === "") {
+      return res.status(400).json({ error: "El nombre es obligatorio" });
+    }
+
+    if (!valor) {
+      return res.status(400).json({ error: "El valor es obligatorio" });
+    }
+
+    if (!gr) {
+      return res
+        .status(400)
+        .json({ error: "El peso en gramos es obligatorio" });
+    }
+
+    const ingrediente = await Ingrediente.findByIdAndUpdate(
+      id,
+      {
+        proveedor: proveedor?.trim() || "",
+        nombre: nombre.trim(),
+        valor: valor,
+        gr: gr,
+      },
+      { new: true }
+    );
+
+    if (!ingrediente) {
+      return res.status(404).json({ error: "Ingrediente no encontrado" });
+    }
+
+    res.json(ingrediente);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Eliminar un ingrediente
+app.delete("/api/ingredientes/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validación de ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "ID de ingrediente inválido" });
+    }
+
+    const ingrediente = await Ingrediente.findByIdAndDelete(id);
+
+    if (!ingrediente) {
+      return res.status(404).json({ error: "Ingrediente no encontrado" });
+    }
+
+    res.json({ message: "Ingrediente eliminado correctamente" });
+  } catch (error) {
+    console.error("Error al eliminar el ingrediente:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// Obtener un ingrediente por ID
+app.get("/api/ingredientes/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validación de ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "ID de ingrediente inválido" });
+    }
+
+    const ingrediente = await Ingrediente.findById(id);
+
+    if (!ingrediente) {
+      return res.status(404).json({ error: "Ingrediente no encontrado" });
+    }
+
+    res.json(ingrediente);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 startServer();
