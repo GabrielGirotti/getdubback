@@ -431,4 +431,138 @@ app.get("/api/ingredientes/:id", async (req, res) => {
   }
 });
 
+const recetaSchema = new mongoose.Schema({
+  nombre: { type: String, required: true },
+  raciones: { type: Number, default: 0 },
+  descripcion: { type: String, default: "" },
+  composicion: [
+    {
+      ingrediente: { type: mongoose.Schema.Types.ObjectId, ref: "Ingrediente" },
+      gr: { type: Number, default: 0 },
+      valor: { type: Number, default: 0 },
+    },
+  ],
+  fechaCreacion: { type: Date, default: Date.now },
+});
+
+const Receta = mongoose.model("Receta", recetaSchema);
+
+app.get("/api/recetas", async (req, res) => {
+  try {
+    const recetas = await Receta.find().populate("composicion.ingrediente"); // 🔑 aquí está el truco
+    res.json(recetas);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Crear una nueva receta
+app.post("/api/recetas", async (req, res) => {
+  try {
+    const { nombre, raciones, descripcion, composicion } = req.body;
+
+    // Validación
+    if (!nombre || nombre.trim() === "") {
+      return res.status(400).json({ error: "El nombre es obligatorio" });
+    }
+
+    const receta = new Receta({
+      nombre: nombre.trim(),
+      raciones: raciones ?? 0,
+      descripcion: descripcion?.trim() ?? "",
+      composicion: Array.isArray(composicion) ? composicion : [],
+    });
+
+    await receta.save();
+
+    const recetaConIngredientes = await Receta.findById(receta._id).populate(
+      "composicion.ingrediente"
+    );
+
+    res.status(201).json(recetaConIngredientes);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Eliminar una receta
+app.delete("/api/recetas/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validación de ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "ID de receta inválido" });
+    }
+
+    const receta = await Receta.findByIdAndDelete(id);
+
+    if (!receta) {
+      return res.status(404).json({ error: "Receta no encontrada" });
+    }
+
+    res.json({ message: "Receta eliminada correctamente" });
+  } catch (error) {
+    console.error("Error al eliminar receta:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// Actualizar una receta
+app.put("/api/recetas/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre, raciones, descripcion, composicion } = req.body;
+
+    // Validación de ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "ID de receta inválido" });
+    }
+
+    // Validación
+    if (!nombre || nombre.trim() === "") {
+      return res.status(400).json({ error: "El nombre es obligatorio" });
+    }
+
+    const receta = await Receta.findByIdAndUpdate(
+      id,
+      {
+        nombre: nombre.trim(),
+        raciones: raciones ?? 0,
+        descripcion: descripcion?.trim() ?? "",
+        composicion: Array.isArray(composicion) ? composicion : [],
+      },
+      { new: true }
+    );
+
+    if (!receta) {
+      return res.status(404).json({ error: "Receta no encontrada" });
+    }
+
+    const recetaConIngredientes = await Receta.findById(receta._id).populate(
+      "composicion.ingrediente"
+    );
+
+    res.status(201).json(recetaConIngredientes);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Obtener una receta por id
+
+app.get("/api/recetas/:id", async (req, res) => {
+  try {
+    const receta = await Receta.findById(req.params.id).populate(
+      "composicion.ingrediente"
+    );
+
+    if (!receta) return res.status(404).json({ error: "No encontrada" });
+
+    res.json(receta);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 startServer();
