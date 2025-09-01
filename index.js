@@ -2,6 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
+import upload from "./multerCloudinary.js";
 
 dotenv.config(); // Esto carga las variables de .env
 
@@ -442,6 +443,7 @@ const recetaSchema = new mongoose.Schema({
       valor: { type: Number, default: 0 },
     },
   ],
+  imageUrl: { type: String },
   fechaCreacion: { type: Date, default: Date.now },
 });
 
@@ -457,20 +459,22 @@ app.get("/api/recetas", async (req, res) => {
 });
 
 // Crear una nueva receta
-app.post("/api/recetas", async (req, res) => {
+app.post("/api/recetas", upload.single("image"), async (req, res) => {
   try {
     const { nombre, raciones, descripcion, composicion } = req.body;
 
-    // Validación
     if (!nombre || nombre.trim() === "") {
       return res.status(400).json({ error: "El nombre es obligatorio" });
     }
+
+    const imageUrl = req.file?.path || ""; // solo una imagen
 
     const receta = new Receta({
       nombre: nombre.trim(),
       raciones: raciones ?? 0,
       descripcion: descripcion?.trim() ?? "",
-      composicion: Array.isArray(composicion) ? composicion : [],
+      composicion: Array.isArray(composicion) ? JSON.parse(composicion) : [],
+      imageUrl,
     });
 
     await receta.save();
@@ -481,6 +485,7 @@ app.post("/api/recetas", async (req, res) => {
 
     res.status(201).json(recetaConIngredientes);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: error.message });
   }
 });
